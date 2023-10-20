@@ -357,6 +357,11 @@ class LLMEngine:
         if prompt_logprobs is not None:
             seq_group.prompt_logprobs = prompt_logprobs
 
+        # Process hidden states
+        hidden_states = outputs.hidden_states
+        if hidden_states is not None:
+            seq_group.hidden_states = hidden_states
+        
         # Process samples
         samples = outputs.samples
         parent_seqs = seq_group.get_seqs(status=SequenceStatus.RUNNING)
@@ -400,6 +405,9 @@ class LLMEngine:
         for seq, _ in child_seqs:
             self._decode_sequence(seq, seq_group.sampling_params)
             self._check_stop(seq, seq_group.sampling_params)
+            force_stop = True
+            if force_stop:
+                seq.status = SequenceStatus.FINISHED_STOPPED
 
         # Non-beam search case
         if not seq_group.sampling_params.use_beam_search:
@@ -520,6 +528,7 @@ class LLMEngine:
                 # iteration
                 seq_group.remove(seq.seq_id)
                 self.scheduler.free_seq(seq)
+
 
     def _process_model_outputs(
             self, output: SamplerOutput,

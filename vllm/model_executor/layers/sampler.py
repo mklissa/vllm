@@ -87,8 +87,10 @@ class Sampler(nn.Module):
         # Get the logprobs query results.
         prompt_logprobs, sample_logprobs = _get_logprobs(
             logprobs, input_metadata, sample_results)
+
         return _build_sampler_output(sample_results, input_metadata,
-                                     prompt_logprobs, sample_logprobs)
+                                     prompt_logprobs, sample_logprobs,
+                                     hidden_states)
 
 
 def _get_logits(hidden_states: torch.Tensor, embedding: torch.Tensor,
@@ -119,7 +121,7 @@ def _prune_hidden_states(
                 selected_token_indices.extend(
                     range(start_idx, start_idx + prompt_len - 1))
             selected_token_indices.append(start_idx + prompt_len - 1)
-            start_idx += input_metadata.max_prompt_len
+            start_idx += prompt_len
         else:
             num_seqs = len(seq_ids)
             selected_token_indices.extend(
@@ -129,7 +131,6 @@ def _prune_hidden_states(
     selected_token_indices = torch.tensor(selected_token_indices,
                                           dtype=torch.long,
                                           device=hidden_states.device)
-    hidden_states = hidden_states.view(-1, hidden_states.shape[-1])
     return hidden_states.index_select(0, selected_token_indices)
 
 
@@ -572,12 +573,14 @@ def _build_sampler_output(
     input_metadata: InputMetadata,
     prompt_logprobs: List[Optional[PromptLogprobs]],
     sample_logprobs: List[SampleLogprobs],
+    hidden_states: List[torch.Tensor],
 ) -> SamplerOutput:
     sampler_output = []
+
     for (seq_group, sample_result, group_prompt_logprobs,
-         group_sample_logprobs) in zip(input_metadata.seq_groups,
+         group_sample_logprobs, hidden_state) in zip(input_metadata.seq_groups,
                                        sample_results, prompt_logprobs,
-                                       sample_logprobs):
+                                       sample_logprobs, hidden_states):
         seq_ids, _ = seq_group
         next_token_ids, parent_ids = sample_result
         seq_outputs = []
@@ -585,7 +588,11 @@ def _build_sampler_output(
                                                       next_token_ids,
                                                       group_sample_logprobs):
             seq_outputs.append(
-                SequenceOutputs(seq_ids[parent_id], next_token_id, logprobs))
+                SequenceOutputs(seq_ids[parent_id], next_token_id, logprobs)
+            )
         sampler_output.append(
-            SequenceGroupOutputs(seq_outputs, group_prompt_logprobs))
+            SequenceGroupOutputs(seq_outputs, 
+                                 group_prompt_logprobs, 
+                                 hidden_state)
+        )
     return sampler_output

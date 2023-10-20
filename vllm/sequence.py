@@ -3,6 +3,8 @@ import copy
 import enum
 from typing import Dict, List, Optional, Union
 
+import torch
+
 from vllm.block import LogicalTokenBlock
 from vllm.sampling_params import SamplingParams
 
@@ -242,6 +244,7 @@ class SequenceGroup:
         self.sampling_params = sampling_params
         self.arrival_time = arrival_time
         self.prompt_logprobs: Optional[PromptLogprobs] = None
+        self.hidden_states: Optional[torch.Tensor] = None
 
     @property
     def prompt(self) -> str:
@@ -393,19 +396,23 @@ class SequenceGroupOutputs:
         self,
         samples: List[SequenceOutputs],
         prompt_logprobs: Optional[PromptLogprobs],
+        hidden_states: Optional[torch.Tensor]
     ) -> None:
         self.samples = samples
         self.prompt_logprobs = prompt_logprobs
+        self.hidden_states = hidden_states
 
     def __repr__(self) -> str:
         return (f"SequenceGroupOutputs(samples={self.samples}, "
-                f"prompt_logprobs={self.prompt_logprobs})")
+                f"prompt_logprobs={self.prompt_logprobs})"
+                f"hidden_states={self.hidden_states}")
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, SequenceGroupOutputs):
             raise NotImplementedError()
         return (self.samples == other.samples
-                and self.prompt_logprobs == other.prompt_logprobs)
+                and self.prompt_logprobs == other.prompt_logprobs
+                and self.hidden_states == other.hidden_states)
 
 
 # For each sequence group, we generate a list of SequenceOutputs object,

@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+import torch
+
 from vllm.sequence import (PromptLogprobs, SampleLogprobs, SequenceGroup,
                            SequenceStatus)
 
@@ -65,6 +67,7 @@ class RequestOutput:
         prompt_logprobs: Optional[PromptLogprobs],
         outputs: List[CompletionOutput],
         finished: bool,
+        hidden_states: Optional[torch.Tensor] = None
     ) -> None:
         self.request_id = request_id
         self.prompt = prompt
@@ -72,11 +75,13 @@ class RequestOutput:
         self.prompt_logprobs = prompt_logprobs
         self.outputs = outputs
         self.finished = finished
+        self.hidden_states = hidden_states
 
     @classmethod
     def from_seq_group(cls, seq_group: SequenceGroup) -> "RequestOutput":
         # Get the top-n sequences.
         n = seq_group.sampling_params.n
+
         seqs = seq_group.get_seqs()
         if seq_group.sampling_params.use_beam_search:
             sorting_key = lambda seq: seq.get_beam_search_score(
@@ -106,9 +111,10 @@ class RequestOutput:
         prompt = seq_group.prompt
         prompt_token_ids = seq_group.prompt_token_ids
         prompt_logprobs = seq_group.prompt_logprobs
+        hidden_states = seq_group.hidden_states
         finished = seq_group.is_finished()
         return cls(seq_group.request_id, prompt, prompt_token_ids,
-                   prompt_logprobs, outputs, finished)
+                   prompt_logprobs, outputs, finished, hidden_states)
 
     def __repr__(self) -> str:
         return (f"RequestOutput(request_id={self.request_id}, "
@@ -116,4 +122,5 @@ class RequestOutput:
                 f"prompt_token_ids={self.prompt_token_ids}, "
                 f"prompt_logprobs={self.prompt_logprobs}, "
                 f"outputs={self.outputs}, "
-                f"finished={self.finished})")
+                f"finished={self.finished})"
+                f"hidden_states={self.hidden_states}")
